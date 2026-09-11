@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Held Together</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --void: #07060a;
+    --mist: rgba(255,255,255,0.62);
+    --faint: rgba(255,255,255,0.30);
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { height:100%; overflow:hidden; background:var(--void); }
+  body {
+    font-family:'Instrument Serif', Georgia, serif;
+    color:var(--mist);
+    -webkit-font-smoothing:antialiased;
+    touch-action:none;
+  }
+  canvas { display:block; position:fixed; inset:0; }
+
+  /* Everything above the canvas is deliberately quiet. The drawing is
+     the only thing in this page allowed to have colour. */
+  .veil {
+    position:fixed; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    z-index:10;
+    transition:opacity 900ms ease, visibility 900ms;
+  }
+  .veil.gone { opacity:0; visibility:hidden; }
+
+  .invite {
+    text-align:center;
+    max-width:30rem;
+    padding:2.5rem;
+    border:1px solid rgba(255,255,255,0.10);
+    border-radius:2px;
+    background:rgba(255,255,255,0.015);
+    transition:border-color 400ms ease, background 400ms ease;
+  }
+  .invite.hot {
+    border-color:rgba(255,255,255,0.38);
+    background:rgba(255,255,255,0.05);
+  }
+  .invite h1 {
+    font-size:clamp(2rem, 6vw, 3.1rem);
+    font-weight:400;
+    font-style:italic;
+    line-height:1.06;
+    color:#fff;
+    letter-spacing:-0.015em;
+    margin-bottom:1.1rem;
+  }
+  .invite p {
+    font-size:1.02rem;
+    line-height:1.65;
+    color:var(--faint);
+    margin-bottom:1.9rem;
+  }
+  .pick {
+    display:inline-block;
+    font-family:inherit;
+    font-size:1rem;
+    font-style:italic;
+    color:#fff;
+    background:none;
+    border:none;
+    border-bottom:1px solid rgba(255,255,255,0.45);
+    padding:0.15rem 0.1rem;
+    cursor:pointer;
+    transition:border-color 250ms ease;
+  }
+  .pick:hover, .pick:focus-visible { border-bottom-color:#fff; }
+  .pick:focus-visible { outline:2px solid #fff; outline-offset:6px; }
+
+  /* One line, shown once, then it gets out of the way for good. */
+  .hint {
+    position:fixed;
+    left:50%; bottom:2.2rem;
+    transform:translateX(-50%);
+    font-size:0.95rem;
+    font-style:italic;
+    color:var(--faint);
+    white-space:nowrap;
+    pointer-events:none;
+    opacity:0;
+    z-index:9;
+    transition:opacity 1200ms ease;
+  }
+  .hint.show { opacity:1; }
+
+  .again {
+    position:fixed;
+    right:1.6rem; bottom:1.5rem;
+    font-family:inherit; font-size:0.9rem; font-style:italic;
+    color:rgba(255,255,255,0.28);
+    background:none; border:none; cursor:pointer;
+    z-index:9; opacity:0; visibility:hidden;
+    transition:opacity 600ms ease, color 250ms ease, visibility 600ms;
+  }
+  .again.show { opacity:1; visibility:visible; }
+  .again:hover { color:rgba(255,255,255,0.75); }
+  .again:focus-visible { outline:2px solid #fff; outline-offset:4px; opacity:1; visibility:visible; }
+
+  .trouble {
+    position:fixed; left:50%; top:2rem; transform:translateX(-50%);
+    font-size:0.92rem; color:#ff9d9d;
+    background:rgba(0,0,0,0.72);
+    border:1px solid rgba(255,157,157,0.32);
+    padding:0.7rem 1.1rem; border-radius:2px;
+    z-index:20; opacity:0; visibility:hidden;
+    transition:opacity 350ms ease, visibility 350ms;
+  }
+  .trouble.show { opacity:1; visibility:visible; }
+
+  input[type=file] { display:none; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .veil, .hint, .again, .trouble { transition-duration:1ms; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="stage"></canvas>
+
+<div class="veil" id="veil">
+  <div class="invite" id="invite">
+    <h1>Give it a drawing<br>and it will hold still</h1>
+    <p>Then touch it, and watch how badly it wants to go back to being itself.</p>
+    <button class="pick" id="pick">Choose an image</button>
+    <input type="file" id="file" accept="image/*">
+  </div>
+</div>
+
+<p class="hint" id="hint">drag across it</p>
+<button class="again" id="again">use another drawing</button>
+<div class="trouble" id="trouble"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  'use strict';
+
+  // ---------------------------------------------------------------
+  // Why this is built the way it is:
+  //
+  // No post-processing pass. The glow comes from additive blending
+  // plus a soft radial falloff computed per-fragment, which looks
+  // close to a bloom pass here and costs a fraction as much on a
+  // phone. It also means this file has exactly one dependency and runs
+  // straight off the filesystem -- no module loader, no CORS problem
+  // when you double-click it.
+  //
+  // Physics runs on the CPU over flat typed arrays. That avoids the
+  // GPGPU ping-pong machinery that makes these demos fragile.
+  // ---------------------------------------------------------------
+
+  var TARGET_PARTICLES = 45000;
+  var WORLD_WIDTH = 100;       // scene units across the image's long edge
+  var SPRING = 0.055;          // pull back toward the original pixel
+  var DAMPING = 0.86;          // bleed off velocity so it settles
+  var PUSH_RADIUS = 14;        // how far the pointer's influence reaches
+  var PUSH_STRENGTH = 62;
+  var DEPTH_SPREAD = 3.0;      // volume, so it reads as an object not a decal
+  var GAIN = 0.9;              // overall brightness; lower it if colours clip to white
+
+  var canvas = document.getElementById('stage');
+  var veil = document.getElementById('veil');
+  var invite = document.getElementById('invite');
+  var pick = document.getElementById('pick');
+  var fileInput = document.getElementById('file');
+  var hint = document.getElementById('hint');
+  var again = document.getElementById('again');
+  var trouble = document.getElementById('trouble');
+
+  var renderer, scene, camera, points, geometry, material;
+  var positions, origins, velocities;
+  var count = 0;
+  var running = false;
+  var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Half-extents of the artwork in scene units, used to frame it.
+  var artHalfW = WORLD_WIDTH / 2, artHalfH = WORLD_WIDTH / 2;
+
+  var pointer = { x: 1e9, y: 1e9, active: false };
+  var clock = null;
+
+  function fail(message) {
+    trouble.textContent = message;
+    trouble.classList.add('show');
+    setTimeout(function () { trouble.classList.remove('show'); }, 5200);
+  }
+
+  // --- WebGL support, checked before anything else is attempted -----
+  function webglAvailable() {
+    try {
+      var c = document.createElement('canvas');
+      return !!(window.WebGLRenderingContext &&
+        (c.getContext('webgl') || c.getContext('experimental-webgl')));
+    } catch (e) { return false; }
+  }
+
+  if (!webglAvailable()) {
+    invite.innerHTML =
+      '<h1>This browser can\u2019t draw it</h1>' +
+      '<p>It needs WebGL. Safari, Chrome, Firefox or Edge on almost any ' +
+      'device from the last decade will run this \u2014 it\u2019s likely ' +
+      'switched off in settings, or hardware acceleration is disabled.</p>';
+    return;
+  }
+
+  // --- Scene ------------------------------------------------------
+  function initScene() {
+    renderer = new THREE.WebGLRenderer({
+      canvas: canvas,
+      antialias: false,
+      alpha: false,
+      powerPreference: 'high-performance'
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setClearColor(0x07060a, 1);
+
+    scene = new THREE.Scene();
+
+    camera = new THREE.PerspectiveCamera(
+      50, window.innerWidth / window.innerHeight, 0.1, 1000
+    );
+    camera.position.set(0, 0, 105);
+
+    clock = new THREE.Clock();
+    window.addEventListener('resize', onResize);
+  }
+
+  function onResize() {
+    if (!renderer) return;
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    fitCamera();
+    updatePointScale();
+  }
+
+  // Frame the artwork so it fills the viewport without cropping,
+  // whichever way the screen is held. Checks height and width
+  // separately and takes whichever needs the camera further back.
+  function fitCamera() {
+    if (!points) return;
+    var t = Math.tan((camera.fov * Math.PI) / 360); // tan(vFov / 2)
+    var distForHeight = artHalfH / t;
+    var distForWidth = artHalfW / (t * camera.aspect);
+    camera.position.z = Math.max(distForHeight, distForWidth) * 1.22;
+  }
+
+  // Converts a size in scene units into pixels at a given depth, using
+  // the camera's real projection rather than a guessed constant.
+  function updatePointScale() {
+    if (!material) return;
+    material.uniforms.uScale.value =
+      (window.innerHeight * renderer.getPixelRatio()) /
+      (2 * Math.tan((camera.fov * Math.PI) / 360));
+  }
+
+  // --- Turning an image into particles -----------------------------
+  function buildFromImage(img) {
+    var maxEdge = 620; // plenty of detail, bounded work for getImageData
+    var scale = Math.min(1, maxEdge / Math.max(img.width, img.height));
+    var w = Math.max(1, Math.round(img.width * scale));
+    var h = Math.max(1, Math.round(img.height * scale));
+
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(img, 0, 0, w, h);
+
+    var data;
+    try {
+      data = ctx.getImageData(0, 0, w, h).data;
+    } catch (e) {
+      fail('That image couldn\u2019t be read. Try a PNG or JPG from your device.');
+      return false;
+    }
+
+    // Find which pixels count. Drop transparent and paper-white only;
+    // a pale wash is part of the drawing and is deliberately kept.
+    var keep = [];
+    var weights = [];
+    var totalWeight = 0;
+    for (var i = 0; i < w * h; i++) {
+      var o = i * 4;
+      if (data[o + 3] < 24) continue;
+      var r = data[o], g = data[o + 1], b = data[o + 2];
+      if (r > 243 && g > 243 && b > 243) continue;
+      keep.push(i);
+
+      // Saturated ink gets more particles than a pale wash, so the
+      // subject of a drawing keeps its detail even when the background
+      // covers most of the page.
+      var mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+      var wgt = 0.35 + (mx ? (mx - mn) / mx : 0);
+      weights.push(wgt);
+      totalWeight += wgt;
+    }
+
+    if (keep.length < 60) {
+      fail('That image is nearly blank \u2014 nothing to build from.');
+      return false;
+    }
+
+    // Random, weighted sampling. Taking every Nth pixel from a
+    // row-major list lines particles up into visible diagonal stripes.
+    var chosen = [];
+    var rate = TARGET_PARTICLES / totalWeight;
+    for (var k = 0; k < keep.length; k++) {
+      if (Math.random() < weights[k] * rate) chosen.push(keep[k]);
+    }
+    if (chosen.length < 60) chosen = keep.slice(0, Math.min(keep.length, TARGET_PARTICLES));
+
+    count = chosen.length;
+    positions = new Float32Array(count * 3);
+    origins = new Float32Array(count * 3);
+    velocities = new Float32Array(count * 3);
+    var colors = new Float32Array(count * 3);
+    var sizes = new Float32Array(count);
+
+    var unit = WORLD_WIDTH / Math.max(w, h);
+    var halfW = (w * unit) / 2;
+    var halfH = (h * unit) / 2;
+    artHalfW = halfW;
+    artHalfH = halfH;
+
+    // Average gap between neighbouring particles, in scene units.
+    // Sizing points from this (not from pixel size) means they overlap
+    // enough for the glow to build up, however many were sampled.
+    var spacing = unit * Math.sqrt(keep.length / count);
+
+    for (var n = 0; n < count; n++) {
+      var idx = chosen[n];
+      var px = idx % w;
+      var py = Math.floor(idx / w);
+      var off = idx * 4;
+
+      var cr = data[off] / 255;
+      var cg = data[off + 1] / 255;
+      var cb = data[off + 2] / 255;
+
+      var x = px * unit - halfW;
+      var y = halfH - py * unit;      // flip: canvas y grows downward
+      // Brighter ink sits slightly forward, so the piece has genuine
+      // depth rather than being a flat plane of dots.
+      var lum = 0.299 * cr + 0.587 * cg + 0.114 * cb;
+      var z = (Math.random() - 0.5) * DEPTH_SPREAD + (lum - 0.5) * DEPTH_SPREAD * 0.9;
+
+      var p = n * 3;
+      origins[p] = x; origins[p + 1] = y; origins[p + 2] = z;
+
+      // Start scattered, then let the spring assemble the drawing on
+      // load. The first thing you see is it pulling itself together.
+      var ang = Math.random() * Math.PI * 2;
+      var rad = 55 + Math.random() * 85;
+      positions[p] = Math.cos(ang) * rad;
+      positions[p + 1] = Math.sin(ang) * rad;
+      positions[p + 2] = (Math.random() - 0.5) * 60;
+
+      colors[p] = cr; colors[p + 1] = cg; colors[p + 2] = cb;
+
+      // Saturated ink burns a little larger than the wash, which keeps
+      // line work legible against a broad background tone.
+      var mx2 = Math.max(cr, Math.max(cg, cb));
+      var mn2 = Math.min(cr, Math.min(cg, cb));
+      var sat = mx2 <= 0 ? 0 : (mx2 - mn2) / mx2;
+      sizes[n] = spacing * (1.5 + sat * 0.8);
+    }
+
+    if (geometry) geometry.dispose();
+    geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+
+    if (!material) {
+      material = new THREE.ShaderMaterial({
+        uniforms: {
+          uScale: { value: 1 },
+          uGain: { value: GAIN }
+        },
+        vertexShader: [
+          'attribute float size;',
+          'varying vec3 vColor;',
+          'uniform float uScale;',
+          'void main() {',
+          '  vColor = color;',
+          '  vec4 mv = modelViewMatrix * vec4(position, 1.0);',
+          // Perspective-correct sizing from the real projection.
+          '  gl_PointSize = size * uScale / -mv.z;',
+          '  gl_Position = projectionMatrix * mv;',
+          '}'
+        ].join('\n'),
+        fragmentShader: [
+          'varying vec3 vColor;',
+          'uniform float uGain;',
+          'void main() {',
+          '  vec2 d = gl_PointCoord - vec2(0.5);',
+          '  float r = dot(d, d);',
+          '  if (r > 0.25) discard;',
+          // Soft falloff squared: a tight core with a wide dim halo.
+          // Summed additively across overlapping points this reads as
+          // bloom, without a post-processing pass. Kept gentle so the
+          // original colours survive the overlap instead of going white.
+          '  float glow = 1.0 - r * 4.0;',
+          '  glow *= glow;',
+          '  gl_FragColor = vec4(vColor * (0.3 + glow * 0.7) * uGain, glow);',
+          '}'
+        ].join('\n'),
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        vertexColors: true
+      });
+    }
+
+    if (points) scene.remove(points);
+    points = new THREE.Points(geometry, material);
+    scene.add(points);
+    fitCamera();
+    updatePointScale();
+    return true;
+  }
+
+  // --- Pointer ----------------------------------------------------
+  // Project the cursor onto the z=0 plane so the push lands where the
+  // finger visually is, not where it is in screen space.
+  var ndc = new THREE.Vector3();
+  function updatePointer(clientX, clientY) {
+    ndc.set(
+      (clientX / window.innerWidth) * 2 - 1,
+      -(clientY / window.innerHeight) * 2 + 1,
+      0.5
+    );
+    ndc.unproject(camera);
+    var dir = ndc.sub(camera.position).normalize();
+    var dist = -camera.position.z / dir.z;
+    pointer.x = camera.position.x + dir.x * dist;
+    pointer.y = camera.position.y + dir.y * dist;
+  }
+
+  function bindPointer() {
+    function move(e) {
+      var t = e.touches ? e.touches[0] : e;
+      if (!t) return;
+      pointer.active = true;
+      updatePointer(t.clientX, t.clientY);
+      dismissHint();
+    }
+    function leave() { pointer.active = false; pointer.x = 1e9; pointer.y = 1e9; }
+
+    window.addEventListener('mousemove', move, { passive: true });
+    // mouseleave on window doesn't fire reliably; the root element does.
+    document.documentElement.addEventListener('mouseleave', leave, { passive: true });
+    window.addEventListener('blur', leave, { passive: true });
+    window.addEventListener('touchstart', move, { passive: true });
+    window.addEventListener('touchmove', move, { passive: true });
+    window.addEventListener('touchend', leave, { passive: true });
+    window.addEventListener('touchcancel', leave, { passive: true });
+  }
+
+  // The hint only counts as seen once it has actually been on screen.
+  // Otherwise a mouse already moving on load would cancel it before it
+  // ever appeared.
+  var hintShown = false, hintTimer = null, hintHideTimer = null;
+  function dismissHint() {
+    if (hintShown || !hint.classList.contains('show')) return;
+    hintShown = true;
+    clearTimeout(hintTimer);
+    clearTimeout(hintHideTimer);
+    hint.classList.remove('show');
+  }
+
+  function scheduleHint() {
+    if (hintShown) return;
+    clearTimeout(hintTimer);
+    clearTimeout(hintHideTimer);
+    hintTimer = setTimeout(function () {
+      if (hintShown) return;
+      hint.classList.add('show');
+      hintHideTimer = setTimeout(function () {
+        hint.classList.remove('show');
+        hintShown = true;
+      }, 6400);
+    }, 2600);
+  }
+
+  // --- Loop -------------------------------------------------------
+  function tick() {
+    if (!running) return;
+    requestAnimationFrame(tick);
+
+    var dt = Math.min(clock.getDelta(), 0.05); // clamp: tab-switch safety
+    var f = dt * 60;                            // normalise to 60fps
+    var damp = Math.pow(DAMPING, f);
+    var pr2 = PUSH_RADIUS * PUSH_RADIUS;
+
+    for (var n = 0; n < count; n++) {
+      var p = n * 3;
+      var x = positions[p], y = positions[p + 1], z = positions[p + 2];
+
+      // Spring home. This is the whole idea of the piece: whatever you
+      // do to it, it is always trying to become the drawing again.
+      var vx = velocities[p] + (origins[p] - x) * SPRING * f;
+      var vy = velocities[p + 1] + (origins[p + 1] - y) * SPRING * f;
+      var vz = velocities[p + 2] + (origins[p + 2] - z) * SPRING * f;
+
+      if (pointer.active) {
+        var dx = x - pointer.x, dy = y - pointer.y;
+        var d2 = dx * dx + dy * dy;
+        if (d2 < pr2 && d2 > 0.0001) {
+          var d = Math.sqrt(d2);
+          var falloff = (1 - d / PUSH_RADIUS);
+          var force = (falloff * falloff * PUSH_STRENGTH * f) / d;
+          vx += dx * force;
+          vy += dy * force;
+          vz += (Math.random() - 0.5) * falloff * 9 * f;
+        }
+      }
+
+      vx *= damp; vy *= damp; vz *= damp;
+      velocities[p] = vx; velocities[p + 1] = vy; velocities[p + 2] = vz;
+      positions[p] = x + vx * dt;
+      positions[p + 1] = y + vy * dt;
+      positions[p + 2] = z + vz * dt;
+    }
+
+    geometry.attributes.position.needsUpdate = true;
+
+    if (!reducedMotion && points) {
+      // A slow drift, not a spin. Enough to catch the light on the
+      // depth and prove it is an object.
+      var t = clock.getElapsedTime();
+      points.rotation.y = Math.sin(t * 0.16) * 0.14;
+      points.rotation.x = Math.cos(t * 0.12) * 0.06;
+    }
+
+    renderer.render(scene, camera);
+  }
+
+  // --- Loading ----------------------------------------------------
+  function loadFile(file) {
+    if (!file) return;
+    if (!/^image\//.test(file.type)) {
+      fail('That\u2019s not an image file.');
+      return;
+    }
+    var reader = new FileReader();
+    reader.onerror = function () { fail('That file couldn\u2019t be opened.'); };
+    reader.onload = function (ev) {
+      var img = new Image();
+      img.onerror = function () { fail('That image couldn\u2019t be decoded.'); };
+      img.onload = function () {
+        if (!renderer) initScene();
+        if (!buildFromImage(img)) return;
+
+        veil.classList.add('gone');
+        again.classList.add('show');
+
+        if (!running) { running = true; bindPointer(); tick(); }
+        scheduleHint();
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  pick.addEventListener('click', function () { fileInput.click(); });
+  fileInput.addEventListener('change', function (e) {
+    loadFile(e.target.files && e.target.files[0]);
+    e.target.value = '';
+  });
+  again.addEventListener('click', function () { fileInput.click(); });
+
+  // Drop anywhere on the page, not just on the panel.
+  ['dragenter', 'dragover'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      e.preventDefault();
+      if (!veil.classList.contains('gone')) invite.classList.add('hot');
+    });
+  });
+  ['dragleave', 'drop'].forEach(function (ev) {
+    window.addEventListener(ev, function (e) {
+      e.preventDefault();
+      invite.classList.remove('hot');
+    });
+  });
+  window.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var dt = e.dataTransfer;
+    if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
+  });
+
+  // Paste straight from a screenshot or a photo in the clipboard.
+  window.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') === 0) {
+        loadFile(items[i].getAsFile());
+        break;
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
