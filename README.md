@@ -6,16 +6,23 @@ One HTML file, one dependency (three.js r128 from a CDN), no build step. Open `i
 
 ## Use it
 
-Move across the drawing to push it. Drag fast to flick particles in the direction you're moving. Double-click or double-tap to scatter from that point.
+Move across the drawing to push it. Drag fast to flick particles in the direction you're moving. Double-click or double-tap to scatter from that point. The speed control in the dock slows everything down to a quarter or speeds it up to double, including how fast the drawing builds itself.
 
 | Key | Action |
 | --- | --- |
 | Space or S | Scatter the whole drawing |
+| B | Replay the build |
+| [ and ] | Slower, faster |
+| R | Record a clip |
 | O | Use your own drawing |
-| R | Record a 6 second clip |
 | D | Show stats |
+| ? | Show shortcuts |
 
 You can also drop an image anywhere on the page or paste one from the clipboard. Add `?stats` to the URL to open with stats showing.
+
+## Recording
+
+Pick 5, 10 or 15 seconds, and optionally start the clip with the drawing building itself. When it finishes, a preview opens. Nothing is saved until you press Save video. In Chrome and Edge that opens a normal Save dialog; in other browsers the file goes to your Downloads folder, and the preview tells you the file name and the shortcut that opens your downloads. On phones, Share sends the clip straight to Photos or another app.
 
 ## How it works
 
@@ -31,7 +38,7 @@ You can also drop an image anywhere on the page or paste one from the clipboard.
 
 **Accurate interaction.** The pointer is raycast into the drawing's own rotated plane, so the push lands exactly under the finger even while the drawing drifts.
 
-**Also handled:** pausing in background tabs, WebGL context loss, reduced-motion preferences, keyboard access, and screen reader announcements.
+**Also handled:** saving only on a click (browsers can block downloads that start on their own), pausing quality changes while recording, pausing in background tabs, WebGL context loss, reduced-motion preferences, keyboard access, and screen reader announcements.
 
 ## Deploy on GitHub Pages
 

@@ -10,24 +10,38 @@
 <meta name="theme-color" content="#07060a">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
 <style>
   :root {
     --void: #07060a;
     --ink: #f4eef2;
-    --mist: rgba(244,238,242,0.64);
-    --faint: rgba(244,238,242,0.36);
-    --line: rgba(244,238,242,0.18);
+    --mist: rgba(244,238,242,0.70);
+    --faint: rgba(244,238,242,0.44);
+    --dim: rgba(244,238,242,0.28);
+    --line: rgba(244,238,242,0.12);
+    --line-2: rgba(244,238,242,0.24);
+    --glass: rgba(17,13,21,0.72);
+    --glass-2: rgba(17,13,21,0.9);
     --blush: #ff8fae;
-    --pad: clamp(1.1rem, 3.2vw, 2.2rem);
+    --rec: #ff5c74;
+    --pad: clamp(1rem, 3vw, 2rem);
+    --radius: 16px;
+    --serif: 'Instrument Serif', Georgia, serif;
+    --sans: 'Instrument Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --ease: cubic-bezier(.2,.7,.2,1);
   }
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { height:100%; overflow:hidden; background:var(--void); }
   body {
-    font-family:'Instrument Serif', Georgia, serif;
+    font-family:var(--sans);
     color:var(--mist);
     -webkit-font-smoothing:antialiased;
   }
+  button { font:inherit; color:inherit; }
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    outline:2px solid var(--ink); outline-offset:3px;
+  }
+
   canvas {
     display:block; position:fixed; inset:0;
     width:100%; height:100%;
@@ -35,86 +49,265 @@
   }
   body.ring-mode canvas { cursor:none; }
 
-  /* The drawing is the only thing on the page with colour. Everything
-     else is set in one serif, in white at different strengths. */
+  /* The drawing carries all the colour. Chrome around it is glass and
+     hairlines, a serif for voice and a sans for anything you operate. */
   .ui { opacity:0; transition:opacity 1400ms ease; }
   body.ready .ui { opacity:1; }
 
+  /* ---------- Masthead ---------- */
   .masthead {
     position:fixed; z-index:5;
     top:calc(var(--pad) + env(safe-area-inset-top));
     left:calc(var(--pad) + env(safe-area-inset-left));
-    max-width:21rem;
+    max-width:22rem;
     pointer-events:none;
   }
   .masthead h1 {
-    font-weight:400; font-style:italic;
-    font-size:clamp(1.7rem, 3.4vw, 2.35rem);
-    line-height:1.02;
+    font:italic 400 clamp(1.9rem, 3.6vw, 2.6rem)/1 var(--serif);
     letter-spacing:-0.012em;
     color:var(--ink);
   }
   .masthead p {
-    margin-top:0.6rem;
-    font-size:1.02rem;
-    line-height:1.5;
+    margin-top:0.65rem;
+    font:400 1.08rem/1.45 var(--serif);
     color:var(--faint);
   }
+  .masthead .credit {
+    margin-top:1rem;
+    font:400 0.8rem/1 var(--sans);
+    color:var(--dim);
+    pointer-events:auto;
+  }
+  .masthead .credit a { color:inherit; text-decoration:none; border-bottom:1px solid var(--line-2); }
+  .masthead .credit a:hover { color:var(--ink); }
 
-  .controls {
-    position:fixed; z-index:5;
-    left:calc(var(--pad) + env(safe-area-inset-left));
-    right:calc(var(--pad) + env(safe-area-inset-right));
-    bottom:calc(var(--pad) - 0.5rem + env(safe-area-inset-bottom));
-    display:flex; flex-wrap:wrap; align-items:center;
-    gap:0 1.7rem;
-  }
-  .controls button {
-    font:inherit; font-size:1.05rem; font-style:italic;
-    color:var(--mist);
-    background:none; border:0;
-    border-bottom:1px solid transparent;
-    min-height:44px; padding:0.5rem 0 0.35rem;
-    cursor:pointer;
-    transition:color 250ms ease, border-color 250ms ease;
-  }
-  .controls button:hover { color:var(--ink); border-bottom-color:var(--line); }
-  .controls button.live { color:var(--blush); }
-  .controls button.live::before {
-    content:''; display:inline-block;
-    width:0.42em; height:0.42em; margin-right:0.5em;
-    border-radius:50%; background:var(--blush);
-    vertical-align:0.12em;
-  }
-  .controls .aside {
-    margin-left:auto;
-    font-size:0.92rem; font-style:italic;
-    color:var(--faint);
-  }
-  button:focus-visible { outline:2px solid var(--ink); outline-offset:5px; }
-
-  .hud {
+  /* ---------- Top-right corner ---------- */
+  .corner {
     position:fixed; z-index:5;
     top:calc(var(--pad) + env(safe-area-inset-top));
     right:calc(var(--pad) + env(safe-area-inset-right));
-    text-align:right;
-    font-size:0.95rem; line-height:1.55;
+    display:flex; flex-direction:column; align-items:flex-end; gap:0.9rem;
+  }
+  .link {
+    background:none; border:0; cursor:pointer;
+    font:500 0.82rem/1 var(--sans);
     color:var(--faint);
-    font-variant-numeric:tabular-nums;
-    pointer-events:none;
+    padding:0.5rem 0;
+    border-bottom:1px solid transparent;
+    transition:color 200ms ease, border-color 200ms ease;
+  }
+  .link:hover { color:var(--ink); border-bottom-color:var(--line-2); }
+  .hud {
     display:none;
+    text-align:right;
+    font:400 0.8rem/1.7 var(--sans);
+    font-variant-numeric:tabular-nums;
+    color:var(--faint);
+    pointer-events:none;
   }
   .hud.show { display:block; }
-  .hud b { font-weight:400; color:var(--ink); }
+  .hud b { font-weight:500; color:var(--ink); }
 
-  /* A ring the size of the push radius, so the cursor shows what it
-     will do before it does it. Fine pointers only. */
+  /* ---------- Dock ---------- */
+  .dock {
+    position:fixed; z-index:6;
+    left:50%; transform:translateX(-50%);
+    bottom:calc(var(--pad) + env(safe-area-inset-bottom));
+    display:flex; align-items:center; gap:0.2rem;
+    padding:0.35rem;
+    background:var(--glass);
+    border:1px solid var(--line);
+    border-radius:20px;
+    -webkit-backdrop-filter:blur(18px) saturate(140%);
+    backdrop-filter:blur(18px) saturate(140%);
+    box-shadow:0 12px 44px rgba(0,0,0,0.45);
+    white-space:nowrap;
+  }
+  .sep { width:1px; height:1.6rem; background:var(--line); margin:0 0.3rem; flex:none; }
+
+  .tool {
+    display:inline-flex; align-items:center; gap:0.55rem;
+    height:2.75rem; padding:0 0.9rem;
+    border:0; border-radius:14px;
+    background:transparent; color:var(--mist);
+    font:500 0.86rem/1 var(--sans);
+    cursor:pointer;
+    transition:background 200ms ease, color 200ms ease;
+  }
+  .tool:hover { background:rgba(244,238,242,0.07); color:var(--ink); }
+  .tool:active { background:rgba(244,238,242,0.11); }
+  .tool svg { width:1.1rem; height:1.1rem; flex:none; }
+
+  .dot {
+    width:0.62rem; height:0.62rem; flex:none;
+    border-radius:50%; background:var(--rec);
+    box-shadow:0 0 0 3px rgba(255,92,116,0.18);
+  }
+  .tool.rec { font-variant-numeric:tabular-nums; }
+  .tool.rec.live { background:rgba(255,92,116,0.14); color:var(--ink); }
+  .tool.rec.live .dot { animation:pulse 1.2s ease-in-out infinite; }
+  @keyframes pulse {
+    0%, 100% { box-shadow:0 0 0 3px rgba(255,92,116,0.35); }
+    50% { box-shadow:0 0 0 7px rgba(255,92,116,0); }
+  }
+
+  /* Segmented control: speed in the dock, length in the record card. */
+  .seg {
+    display:inline-flex; align-items:center; gap:0.1rem;
+    padding:0.22rem;
+    border-radius:13px;
+    background:rgba(244,238,242,0.05);
+  }
+  .seg-label {
+    font:500 0.8rem/1 var(--sans);
+    color:var(--faint);
+    padding:0 0.5rem 0 0.55rem;
+  }
+  .seg button {
+    height:2.2rem; min-width:2.4rem; padding:0 0.6rem;
+    border:0; border-radius:10px;
+    background:transparent; color:var(--faint);
+    font:500 0.84rem/1 var(--sans);
+    font-variant-numeric:tabular-nums;
+    cursor:pointer;
+    transition:background 200ms ease, color 200ms ease;
+  }
+  .seg button:hover { color:var(--ink); }
+  .seg button[aria-pressed="true"] { background:var(--ink); color:var(--void); }
+
+  /* ---------- Recording progress ---------- */
+  .progress {
+    position:fixed; left:0; top:0; z-index:30;
+    width:100%; height:2px;
+    background:var(--rec);
+    transform-origin:left center;
+    transform:scaleX(0);
+    opacity:0;
+    pointer-events:none;
+  }
+  .progress.run { opacity:1; }
+
+  /* ---------- Cards ---------- */
+  .card {
+    position:fixed; z-index:8;
+    left:50%; bottom:6rem;
+    width:min(26rem, calc(100vw - 2 * var(--pad)));
+    max-height:calc(100vh - 7rem);
+    overflow:auto;
+    padding:1.4rem 1.45rem 1.25rem;
+    background:var(--glass-2);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    -webkit-backdrop-filter:blur(22px) saturate(140%);
+    backdrop-filter:blur(22px) saturate(140%);
+    box-shadow:0 26px 70px rgba(0,0,0,0.6);
+    color:var(--mist);
+    opacity:0; visibility:hidden;
+    transform:translate(-50%, 10px);
+    transition:opacity 260ms var(--ease), transform 260ms var(--ease), visibility 260ms;
+  }
+  .card.open { opacity:1; visibility:visible; transform:translate(-50%, 0); }
+  .card.wide { width:min(34rem, calc(100vw - 2 * var(--pad))); }
+  .card h2 {
+    font:italic 400 1.7rem/1.05 var(--serif);
+    color:var(--ink);
+    margin-bottom:1.1rem;
+  }
+  .field { margin-bottom:1.1rem; }
+  .field-label {
+    display:block;
+    font:500 0.8rem/1 var(--sans);
+    color:var(--faint);
+    margin-bottom:0.55rem;
+  }
+
+  .switch-row {
+    display:flex; align-items:center; justify-content:space-between; gap:1rem;
+    font-size:0.9rem; line-height:1.4; color:var(--mist);
+    margin-bottom:1rem;
+    cursor:pointer;
+  }
+  .switch {
+    -webkit-appearance:none; appearance:none;
+    position:relative; flex:none;
+    width:2.5rem; height:1.45rem;
+    border-radius:999px;
+    background:rgba(244,238,242,0.16);
+    cursor:pointer;
+    transition:background 200ms ease;
+  }
+  .switch::after {
+    content:''; position:absolute; top:3px; left:3px;
+    width:calc(1.45rem - 6px); height:calc(1.45rem - 6px);
+    border-radius:50%; background:var(--ink);
+    transition:transform 220ms var(--ease);
+  }
+  .switch:checked { background:var(--blush); }
+  .switch:checked::after { transform:translateX(1.05rem); }
+
+  .note { font-size:0.82rem; line-height:1.55; color:var(--faint); margin-bottom:1.15rem; }
+  .meta { font-size:0.84rem; color:var(--faint); margin:0.8rem 0 1rem; font-variant-numeric:tabular-nums; }
+
+  .actions { display:flex; flex-wrap:wrap; gap:0.5rem; }
+  .btn {
+    display:inline-flex; align-items:center; gap:0.55rem;
+    height:2.75rem; padding:0 1.15rem;
+    border:1px solid var(--line-2); border-radius:12px;
+    background:transparent; color:var(--ink);
+    font:500 0.9rem/1 var(--sans);
+    cursor:pointer;
+    transition:background 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+  .btn:hover { background:rgba(244,238,242,0.08); }
+  .btn.primary { background:var(--ink); color:var(--void); border-color:var(--ink); }
+  .btn.primary:hover { background:#fff; }
+  .btn.ghost { border-color:transparent; color:var(--faint); }
+  .btn.ghost:hover { color:var(--ink); background:transparent; }
+  .btn svg { width:1rem; height:1rem; flex:none; }
+
+  .card video {
+    display:block; width:100%;
+    max-height:38vh;
+    object-fit:contain;
+    background:#000;
+    border-radius:10px;
+    border:1px solid var(--line);
+  }
+
+  .saved {
+    margin:1rem 0 0; padding:0.85rem 0.95rem;
+    border-radius:11px;
+    background:rgba(244,238,242,0.05);
+    border:1px solid var(--line);
+    font-size:0.86rem; line-height:1.55; color:var(--mist);
+  }
+  .saved[hidden] { display:none; }
+  .saved strong { font-weight:500; color:var(--ink); word-break:break-all; }
+
+  kbd {
+    display:inline-block; min-width:1.6em;
+    padding:0.12rem 0.42rem;
+    border:1px solid var(--line-2); border-bottom-width:2px;
+    border-radius:6px;
+    font:500 0.76rem/1.3 var(--sans);
+    text-align:center;
+    color:var(--ink);
+  }
+  .keys {
+    display:grid; grid-template-columns:auto 1fr;
+    gap:0.65rem 1.2rem; align-items:center;
+    font-size:0.9rem; margin-bottom:1.1rem;
+  }
+  .keys dt { white-space:nowrap; color:var(--faint); font-size:0.84rem; }
+  .keys dd { color:var(--mist); }
+
+  /* ---------- Cursor ring ---------- */
   .ring {
     position:fixed; left:0; top:0; z-index:4;
     width:var(--r, 80px); height:var(--r, 80px);
     margin-left:calc(var(--r, 80px) / -2);
     margin-top:calc(var(--r, 80px) / -2);
-    border:1px solid rgba(244,238,242,0.26);
+    border:1px solid rgba(244,238,242,0.2);
     border-radius:50%;
     pointer-events:none;
     opacity:0;
@@ -122,43 +315,48 @@
     will-change:transform;
   }
   .ring.on { opacity:1; }
-  .ring.down { border-color:rgba(244,238,242,0.6); }
+  .ring.down { border-color:rgba(244,238,242,0.55); }
 
+  /* ---------- Drop, toast, fallback ---------- */
   .drop {
-    position:fixed; inset:calc(var(--pad) * 0.6); z-index:8;
+    position:fixed; inset:calc(var(--pad) * 0.7); z-index:9;
     display:flex; align-items:center; justify-content:center;
-    border:1px solid rgba(244,238,242,0.4);
-    background:rgba(7,6,10,0.55);
-    font-size:clamp(1.4rem, 3vw, 2rem); font-style:italic; color:var(--ink);
+    border:1px dashed rgba(244,238,242,0.4);
+    border-radius:24px;
+    background:rgba(7,6,10,0.6);
+    font:italic 400 clamp(1.5rem, 3vw, 2.1rem)/1.2 var(--serif);
+    color:var(--ink);
     opacity:0; visibility:hidden; pointer-events:none;
-    transition:opacity 250ms ease, visibility 250ms;
+    transition:opacity 220ms ease, visibility 220ms;
   }
   .drop.show { opacity:1; visibility:visible; }
 
-  .trouble {
-    position:fixed; left:50%; top:calc(var(--pad) + env(safe-area-inset-top));
-    transform:translateX(-50%);
+  .toast {
+    position:fixed; left:50%; z-index:40;
+    top:calc(var(--pad) + env(safe-area-inset-top));
     max-width:calc(100vw - 2rem);
-    font-size:0.98rem; color:#ffb3c4;
-    background:rgba(7,6,10,0.85);
-    border:1px solid rgba(255,143,174,0.35);
-    padding:0.65rem 1.1rem;
-    z-index:20; opacity:0; visibility:hidden;
-    transition:opacity 300ms ease, visibility 300ms;
+    padding:0.75rem 1.05rem;
+    border-radius:12px;
+    background:var(--glass-2);
+    border:1px solid var(--line-2);
+    -webkit-backdrop-filter:blur(16px); backdrop-filter:blur(16px);
+    font:400 0.88rem/1.45 var(--sans);
+    color:var(--ink);
+    opacity:0; visibility:hidden;
+    transform:translate(-50%, -8px);
+    transition:opacity 260ms var(--ease), transform 260ms var(--ease), visibility 260ms;
   }
-  .trouble.show { opacity:1; visibility:visible; }
+  .toast.show { opacity:1; visibility:visible; transform:translate(-50%, 0); }
+  .toast.error { border-color:rgba(255,143,174,0.45); color:#ffc9d5; }
 
   .veil {
-    position:fixed; inset:0; z-index:10;
+    position:fixed; inset:0; z-index:50;
     display:flex; align-items:center; justify-content:center;
     padding:2rem; text-align:center;
+    background:var(--void);
   }
   .veil[hidden] { display:none; }
-  .veil h2 {
-    font-weight:400; font-style:italic;
-    font-size:clamp(1.9rem, 5vw, 2.8rem); line-height:1.08;
-    color:var(--ink); margin-bottom:1rem;
-  }
+  .veil h2 { font:italic 400 clamp(1.9rem, 5vw, 2.8rem)/1.08 var(--serif); color:var(--ink); margin-bottom:1rem; }
   .veil p { max-width:28rem; margin:0 auto; line-height:1.65; color:var(--faint); }
 
   .sr-only {
@@ -166,36 +364,133 @@
     clip:rect(0 0 0 0); white-space:nowrap;
   }
 
+  /* ---------- Small screens ---------- */
+  @media (max-width:760px) {
+    .tool .label { display:none; }
+    .tool.rec .label { display:inline; }
+    .tool { padding:0 0.8rem; }
+  }
   @media (max-width:560px) {
-    .controls .aside { display:none; }
-    .controls { gap:0 1.3rem; }
-    .masthead p { font-size:0.98rem; }
+    .dock {
+      left:calc(var(--pad) + env(safe-area-inset-left));
+      right:calc(var(--pad) + env(safe-area-inset-right));
+      transform:none;
+      flex-wrap:wrap; justify-content:space-between;
+      row-gap:0.3rem;
+    }
+    .dock .sep { display:none; }
+    .dock .speed { order:-1; width:100%; justify-content:space-between; }
+    .dock .speed button { flex:1; }
+    .masthead p { font-size:1rem; max-width:17rem; }
+  }
+  @media (hover:none) {
+    .corner .link { display:none; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .ui, .ring, .drop, .trouble { transition-duration:1ms; }
+    .ui, .ring, .drop, .toast, .card, .switch, .switch::after { transition-duration:1ms; }
+    .tool.rec.live .dot { animation:none; }
   }
 </style>
 </head>
 <body>
 
 <canvas id="stage" role="img" aria-label="A drawing made of glowing particles. Move across it to push them away; they return to the drawing."></canvas>
+<div class="progress" id="progress" aria-hidden="true"></div>
 
 <header class="masthead ui">
   <h1>Held Together</h1>
   <p>Touch it, and watch how badly it wants to go back to being itself.</p>
+  <p class="credit" id="credit"></p>
 </header>
 
-<nav class="controls ui" aria-label="Controls">
-  <button type="button" id="pick">Use your own drawing</button>
-  <button type="button" id="scatter">Scatter it</button>
-  <button type="button" id="record">Record 6 seconds</button>
-  <span class="aside">Press D for stats</span>
+<div class="corner ui">
+  <button type="button" class="link" id="keysBtn" aria-expanded="false" aria-controls="keysCard">Shortcuts</button>
+  <div class="hud" id="hud" aria-hidden="true"></div>
+</div>
+
+<nav class="dock ui" id="dock" aria-label="Controls">
+  <button type="button" class="tool" id="pick" aria-label="Use your own drawing">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2.5"/><circle cx="9" cy="10" r="1.6"/><path d="M20.5 15.5l-4.5-4.5-8.5 8.5"/></svg>
+    <span class="label">Your drawing</span>
+  </button>
+  <button type="button" class="tool" id="scatter" aria-label="Scatter it">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="1.6"/><path d="M12 3.5v3M12 17.5v3M3.5 12h3M17.5 12h3M6 6l2.1 2.1M15.9 15.9L18 18M6 18l2.1-2.1M15.9 8.1L18 6"/></svg>
+    <span class="label">Scatter</span>
+  </button>
+  <button type="button" class="tool" id="replay" aria-label="Replay the build">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3"/><path d="M4.5 4.5v4h4"/></svg>
+    <span class="label">Replay</span>
+  </button>
+  <span class="sep" aria-hidden="true"></span>
+  <div class="seg speed" id="speedGroup" role="group" aria-label="Speed">
+    <span class="seg-label" aria-hidden="true">Speed</span>
+    <button type="button" data-speed="0.25" aria-label="Quarter speed">¼×</button>
+    <button type="button" data-speed="0.5" aria-label="Half speed">½×</button>
+    <button type="button" data-speed="1" aria-label="Normal speed">1×</button>
+    <button type="button" data-speed="1.5" aria-label="One and a half times speed">1½×</button>
+    <button type="button" data-speed="2" aria-label="Double speed">2×</button>
+  </div>
+  <span class="sep" aria-hidden="true"></span>
+  <button type="button" class="tool rec" id="record" aria-expanded="false" aria-controls="recordCard">
+    <span class="dot" aria-hidden="true"></span>
+    <span class="label" id="recordLabel">Record</span>
+  </button>
 </nav>
 
-<div class="hud" id="hud" aria-hidden="true"></div>
+<section class="card" id="recordCard" role="dialog" aria-labelledby="recordTitle">
+  <h2 id="recordTitle">Record a clip</h2>
+  <div class="field">
+    <span class="field-label" id="lengthLabel">Length</span>
+    <div class="seg" id="lengthGroup" role="group" aria-labelledby="lengthLabel">
+      <button type="button" data-length="5">5 sec</button>
+      <button type="button" data-length="10">10 sec</button>
+      <button type="button" data-length="15">15 sec</button>
+    </div>
+  </div>
+  <label class="switch-row" for="fromBuild">
+    <span>Start with the drawing building itself</span>
+    <input type="checkbox" class="switch" id="fromBuild" role="switch" checked>
+  </label>
+  <p class="note" id="recordNote"></p>
+  <div class="actions">
+    <button type="button" class="btn primary" id="startRec"><span class="dot" aria-hidden="true"></span>Start recording</button>
+    <button type="button" class="btn ghost" id="cancelRec">Cancel</button>
+  </div>
+</section>
+
+<section class="card wide" id="previewCard" role="dialog" aria-labelledby="previewTitle">
+  <h2 id="previewTitle">Your clip is ready</h2>
+  <video id="clip" playsinline muted loop autoplay></video>
+  <p class="meta" id="clipMeta"></p>
+  <div class="actions">
+    <button type="button" class="btn primary" id="saveClip">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 4v11M7 10.5l5 5 5-5M5 19.5h14"/></svg>
+      <span id="saveLabel">Save video</span>
+    </button>
+    <button type="button" class="btn" id="shareClip" hidden>Share</button>
+    <button type="button" class="btn ghost" id="discardClip">Discard</button>
+  </div>
+  <div class="saved" id="savedNote" role="status" hidden></div>
+</section>
+
+<section class="card" id="keysCard" role="dialog" aria-labelledby="keysTitle">
+  <h2 id="keysTitle">Shortcuts</h2>
+  <dl class="keys">
+    <dt><kbd>Space</kbd></dt><dd>Scatter it</dd>
+    <dt><kbd>B</kbd></dt><dd>Replay the build</dd>
+    <dt><kbd>[</kbd> <kbd>]</kbd></dt><dd>Slower, faster</dd>
+    <dt><kbd>R</kbd></dt><dd>Record a clip</dd>
+    <dt><kbd>O</kbd></dt><dd>Use your own drawing</dd>
+    <dt><kbd>D</kbd></dt><dd>Show stats</dd>
+    <dt>Double-click</dt><dd>Scatter from that point</dd>
+  </dl>
+  <p class="note">You can also drop or paste an image anywhere on the page.</p>
+  <div class="actions"><button type="button" class="btn ghost" id="closeKeys">Close</button></div>
+</section>
+
 <div class="ring" id="ring" aria-hidden="true"></div>
 <div class="drop" id="drop" aria-hidden="true">Let go to rebuild it from this drawing</div>
-<div class="trouble" id="trouble" role="alert"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 <p class="sr-only" id="status" aria-live="polite"></p>
 <input type="file" id="file" accept="image/*" hidden>
 
@@ -229,7 +524,8 @@
   //   createStage()     three.js scene, camera framing, shaders.
   //   governor          measures real frame time and steps quality down
   //                     on slow devices instead of stuttering.
-  //   recorder          captures the canvas to a video file.
+  //   createRecorder()  captures the canvas to a video file.
+  //   UI                dock, cards, save flow, keyboard.
   //
   // No post-processing pass. The glow is additive blending plus a soft
   // per-fragment falloff; overlapping points sum into bloom at a small
@@ -237,12 +533,17 @@
   // =================================================================
 
   var CONFIG = {
+    // Shown under the title. Set url to your LinkedIn or GitHub, or ''.
+    credit: { text: 'Made by Shrestha', url: '' },
+
     worldWidth: 100,          // scene units across the image's long edge
     maxSampleEdge: 620,       // raster size cap; bounds getImageData work
     depthSpread: 3.0,         // volume, so it reads as an object not a decal
     gain: 0.9,                // overall brightness; lower if colours clip
     frameBudgetMs: 24,        // sustained frame time that triggers a step down
-    recordSeconds: 6,
+    speeds: [0.25, 0.5, 1, 1.5, 2],
+    speedLabels: ['\u00bc\u00d7', '\u00bd\u00d7', '1\u00d7', '1\u00bd\u00d7', '2\u00d7'],
+    defaultLength: 10,        // seconds
     tiers: [
       { name: 'full',     particles: 45000, pixelRatio: 2 },
       { name: 'balanced', particles: 30000, pixelRatio: 1.5 },
@@ -263,28 +564,33 @@
 
   var reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   var finePointer = window.matchMedia('(pointer: fine)').matches;
+  var touchFirst = window.matchMedia('(hover: none)').matches;
 
+  function $(id) { return document.getElementById(id); }
   var el = {
-    canvas: document.getElementById('stage'),
-    pick: document.getElementById('pick'),
-    scatter: document.getElementById('scatter'),
-    record: document.getElementById('record'),
-    file: document.getElementById('file'),
-    hud: document.getElementById('hud'),
-    ring: document.getElementById('ring'),
-    drop: document.getElementById('drop'),
-    trouble: document.getElementById('trouble'),
-    status: document.getElementById('status'),
-    veil: document.getElementById('veil')
+    canvas: $('stage'), progress: $('progress'), credit: $('credit'),
+    keysBtn: $('keysBtn'), hud: $('hud'), dock: $('dock'),
+    pick: $('pick'), scatter: $('scatter'), replay: $('replay'),
+    speedGroup: $('speedGroup'), record: $('record'), recordLabel: $('recordLabel'),
+    recordCard: $('recordCard'), lengthGroup: $('lengthGroup'), fromBuild: $('fromBuild'),
+    recordNote: $('recordNote'), startRec: $('startRec'), cancelRec: $('cancelRec'),
+    previewCard: $('previewCard'), clip: $('clip'), clipMeta: $('clipMeta'),
+    saveClip: $('saveClip'), saveLabel: $('saveLabel'), shareClip: $('shareClip'),
+    discardClip: $('discardClip'), savedNote: $('savedNote'),
+    keysCard: $('keysCard'), closeKeys: $('closeKeys'),
+    ring: $('ring'), drop: $('drop'), toast: $('toast'), status: $('status'),
+    file: $('file'), veil: $('veil')
   };
 
-  var troubleTimer = null;
-  function fail(message) {
-    el.trouble.textContent = message;
-    el.trouble.classList.add('show');
-    clearTimeout(troubleTimer);
-    troubleTimer = setTimeout(function () { el.trouble.classList.remove('show'); }, 5200);
+  var toastTimer = null;
+  function toast(message, isError) {
+    el.toast.textContent = message;
+    el.toast.classList.toggle('error', !!isError);
+    el.toast.classList.add('show');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { el.toast.classList.remove('show'); }, isError ? 5600 : 3200);
   }
+  function fail(message) { toast(message, true); }
   function announce(message) { el.status.textContent = message; }
 
   function webglAvailable() {
@@ -297,7 +603,6 @@
 
   if (typeof THREE === 'undefined' || !webglAvailable()) {
     el.veil.hidden = false;
-    document.querySelector('.controls').hidden = true;
     return;
   }
 
@@ -404,11 +709,16 @@
         start[p + 2] = (Math.random() - 0.5) * 60;
       }
 
-      colors[p] = cr; colors[p + 1] = cg; colors[p + 2] = cb;
-
       var mx = Math.max(cr, cg, cb), mn = Math.min(cr, cg, cb);
       var sat = mx <= 0 ? 0 : (mx - mn) / mx;
-      sizes[n] = spacing * (1.5 + sat * 0.8);
+
+      // Saturated ink is sampled more densely (see rasterize), so each
+      // of its particles is dimmed to match. Without this the overlapping
+      // glow clips, and pinks drift toward magenta.
+      var dim = Math.min(1, 0.7 / (0.35 + sat));
+      colors[p] = cr * dim; colors[p + 1] = cg * dim; colors[p + 2] = cb * dim;
+
+      sizes[n] = spacing * (1.5 + sat * 0.4);
       phases[n] = Math.random();
     }
 
@@ -439,8 +749,8 @@
       this.p = params;
     };
 
-    // Radial burst from a point, every particle gets roughly the same
-    // speed so the whole drawing leaves and comes back together.
+    // Radial burst from a point. Every particle gets roughly the same
+    // speed, so the whole drawing leaves and comes back together.
     Sim.prototype.scatter = function (cx, cy, strength) {
       var pos = this.pos, vel = this.vel;
       for (var n = 0; n < this.count; n++) {
@@ -838,72 +1148,106 @@
   }
 
   // =================================================================
-  // Recorder: canvas -> video file, for sharing
+  // Recorder: canvas -> video Blob. Saving is a separate, user-clicked
+  // step (see the UI section), because browsers are free to block or
+  // silently queue downloads that start without a click.
   // =================================================================
 
-  function createRecorder(canvas, seconds, onState) {
-    var busy = false;
+  function createRecorder(canvas, hooks) {
+    var rec = null, stream = null, timer = null, startedAt = 0;
 
+    // Prefer MP4 (plays everywhere, LinkedIn included). Codec strings
+    // are left to the browser: a pinned H.264 level can reject large
+    // retina canvases.
     function pickType() {
-      var types = [
-        'video/mp4;codecs=avc1.42E01E', 'video/mp4',
-        'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'
-      ];
+      var types = ['video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm'];
       for (var i = 0; i < types.length; i++) {
         if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) return types[i];
       }
       return '';
     }
 
-    function start() {
-      if (busy) return;
-      if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
-        onState({ error: 'This browser can\u2019t record the canvas. Chrome, Edge and Firefox can.' });
-        return;
-      }
-      var type = pickType();
-      var stream = canvas.captureStream(60);
-      var rec;
-      try {
-        rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 12e6 } : undefined);
-      } catch (e) {
-        stream.getTracks().forEach(function (t) { t.stop(); });
-        onState({ error: 'Recording couldn\u2019t start in this browser.' });
-        return;
-      }
-
-      busy = true;
-      var chunks = [];
-      rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onstop = function () {
-        busy = false;
-        stream.getTracks().forEach(function (t) { t.stop(); });
-        var mime = rec.mimeType || type || 'video/webm';
-        var name = 'held-together.' + (/mp4/.test(mime) ? 'mp4' : 'webm');
-        var url = URL.createObjectURL(new Blob(chunks, { type: mime }));
-        var a = document.createElement('a');
-        a.href = url; a.download = name;
-        document.body.appendChild(a); a.click(); a.remove();
-        setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
-        onState({ saved: name });
-      };
-
-      rec.start(250);
-      var left = seconds;
-      onState({ left: left });
-      var timer = setInterval(function () {
-        left--;
-        if (left > 0) { onState({ left: left }); return; }
-        clearInterval(timer);
-        if (rec.state !== 'inactive') rec.stop();
-      }, 1000);
+    function stamp() {
+      var d = new Date();
+      function two(n) { return (n < 10 ? '0' : '') + n; }
+      return d.getFullYear() + '-' + two(d.getMonth() + 1) + '-' + two(d.getDate()) +
+        '-' + two(d.getHours()) + two(d.getMinutes()) + two(d.getSeconds());
     }
 
-    return { start: start, isBusy: function () { return busy; } };
+    function release() {
+      clearInterval(timer); timer = null;
+      if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+      rec = null;
+    }
+
+    function start(seconds) {
+      if (rec) return false;
+      if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
+        hooks.onError('This browser can\u2019t record the canvas. Chrome, Edge, Brave and Firefox can.');
+        return false;
+      }
+      var type = pickType();
+      var chunks = [];
+      var finished = false;
+      try {
+        stream = canvas.captureStream(60);
+        rec = new MediaRecorder(stream, type
+          ? { mimeType: type, videoBitsPerSecond: 12e6 }
+          : { videoBitsPerSecond: 12e6 });
+      } catch (e) {
+        release();
+        hooks.onError('Recording couldn\u2019t start in this browser.');
+        return false;
+      }
+
+      var r = rec;
+      r.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      r.onerror = function () {
+        if (finished) return;
+        finished = true;
+        release();
+        hooks.onError('The browser stopped the recording. Try a shorter clip.');
+      };
+      r.onstop = function () {
+        if (finished) return;
+        finished = true;
+        var took = (performance.now() - startedAt) / 1000;
+        var mime = (r.mimeType || type || 'video/webm').split(';')[0];
+        release();
+        if (!chunks.length) {
+          hooks.onError('The recording came out empty. Try again, or try Chrome.');
+          return;
+        }
+        var ext = mime.indexOf('mp4') !== -1 ? 'mp4' : 'webm';
+        hooks.onDone({
+          blob: new Blob(chunks, { type: mime }),
+          type: mime, ext: ext,
+          name: 'held-together-' + stamp() + '.' + ext,
+          seconds: took
+        });
+      };
+
+      r.start(250);
+      startedAt = performance.now();
+      var left = seconds;
+      hooks.onTick(left, seconds);
+      timer = setInterval(function () {
+        left--;
+        if (left > 0) hooks.onTick(left, seconds); else stop();
+      }, 1000);
+      return true;
+    }
+
+    function stop() {
+      clearInterval(timer); timer = null;
+      if (rec && rec.state !== 'inactive') rec.stop();
+    }
+
+    return { start: start, stop: stop, isBusy: function () { return !!rec; } };
   }
 
   // =================================================================
-  // Wiring
+  // Engine wiring
   // =================================================================
 
   var stage = createStage(el.canvas);
@@ -927,12 +1271,13 @@
   // --- Quality governor ----------------------------------------------
   // Watches real frame times after each build. If the device can't keep
   // up, it steps down a tier once the drawing has settled, quietly,
-  // rather than leaving it to stutter.
+  // rather than leaving it to stutter. Paused while recording so a
+  // clip never changes quality halfway through.
   var governor = {
     frames: 0, total: 0, done: false,
     reset: function () { this.frames = 0; this.total = 0; this.done = false; },
     sample: function (ms) {
-      if (this.done) return;
+      if (this.done || recorder.isBusy()) return;
       this.frames++;
       if (this.frames <= 45) return;           // skip warm-up
       this.total += ms;
@@ -1008,6 +1353,10 @@
     el.ring.classList.add('down');
     if (el.canvas.setPointerCapture) el.canvas.setPointerCapture(e.pointerId);
 
+    // Touching the drawing dismisses the record or shortcuts card,
+    // but never a finished clip that hasn't been saved.
+    if (openCard && openCard !== el.previewCard) closeCard();
+
     // Double tap scatters on touch; mouse uses dblclick below.
     if (e.pointerType === 'touch') {
       var now = performance.now();
@@ -1032,6 +1381,8 @@
 
   // --- Loop ------------------------------------------------------------
   var loopId = 0, lastT = 0, elapsed = 0, frameMs = 16.7;
+  var speedIndex = CONFIG.speeds.indexOf(1);
+  var speed = 1;   // simulation time scale; 0.5 is half-speed slow motion
 
   function tick(now) {
     loopId = requestAnimationFrame(tick);
@@ -1042,7 +1393,7 @@
     elapsed += dt;
 
     samplePointer(dt);
-    host.step(dt, ptr);
+    host.step(dt * speed, ptr);
     stage.render(elapsed);
     governor.sample(ms);
     updateHud(now);
@@ -1063,7 +1414,11 @@
     if (document.hidden) stopLoop(); else startLoop();
   });
 
-  window.addEventListener('resize', function () { stage.resize(); sizeRing(); });
+  window.addEventListener('resize', function () {
+    stage.resize();
+    sizeRing();
+    if (openCard) placeCard(openCard);
+  });
 
   // The browser can drop the GPU context (driver reset, too many tabs).
   el.canvas.addEventListener('webglcontextlost', function (e) {
@@ -1075,6 +1430,58 @@
     if (raster) { rebuild(true); startLoop(); }
   });
 
+  // =================================================================
+  // UI
+  // =================================================================
+
+  // --- Credit ------------------------------------------------------------
+  if (CONFIG.credit && CONFIG.credit.text) {
+    if (CONFIG.credit.url) {
+      var a = document.createElement('a');
+      a.href = CONFIG.credit.url; a.target = '_blank'; a.rel = 'noopener';
+      a.textContent = CONFIG.credit.text;
+      el.credit.appendChild(a);
+    } else {
+      el.credit.textContent = CONFIG.credit.text;
+    }
+  }
+
+  // --- Cards -------------------------------------------------------------
+  // One card open at a time, sitting just above the dock however it
+  // wraps, with focus moved in on open and handed back on close.
+  var openCard = null, cardTrigger = null;
+
+  function placeCard(card) {
+    var top = el.dock.getBoundingClientRect().top;
+    var bottom = Math.max(16, window.innerHeight - top + 12);
+    card.style.bottom = bottom + 'px';
+    card.style.maxHeight = Math.max(200, window.innerHeight - bottom - 16) + 'px';
+  }
+
+  function showCard(card, trigger, focusEl) {
+    if (openCard && openCard !== card) closeCard(true);
+    openCard = card;
+    cardTrigger = trigger || null;
+    placeCard(card);
+    card.classList.add('open');
+    if (trigger) trigger.setAttribute('aria-expanded', 'true');
+    if (focusEl) setTimeout(function () { focusEl.focus(); }, 30);
+  }
+
+  function closeCard(silent) {
+    if (!openCard) return;
+    var card = openCard, trigger = cardTrigger;
+    openCard = null; cardTrigger = null;
+    card.classList.remove('open');
+    if (trigger) trigger.setAttribute('aria-expanded', 'false');
+    if (card === el.previewCard) discardClip();
+    if (!silent && trigger) trigger.focus();
+  }
+
+  function toggleCard(card, trigger, focusEl) {
+    if (openCard === card) closeCard(); else showCard(card, trigger, focusEl);
+  }
+
   // --- Stats overlay -----------------------------------------------------
   var hudNext = 0;
   function updateHud(now) {
@@ -1085,6 +1492,7 @@
       '<b>' + Math.round(1000 / frameMs) + '</b> fps<br>' +
       '<b>' + count.toLocaleString() + '</b> particles<br>' +
       'physics on a <b>' + host.mode + '</b><br>' +
+      'speed <b>' + CONFIG.speedLabels[speedIndex] + '</b><br>' +
       'quality <b>' + tier.name + '</b>, pixel ratio <b>' +
       stage.renderer.getPixelRatio().toFixed(1) + '</b>';
   }
@@ -1094,24 +1502,210 @@
   }
   if (/[?&]stats\b/.test(location.search)) toggleHud();
 
-  // --- Recording ---------------------------------------------------------
-  var recordLabel = 'Record ' + CONFIG.recordSeconds + ' seconds';
-  var recorder = createRecorder(el.canvas, CONFIG.recordSeconds, function (s) {
-    if (s.error) { fail(s.error); return; }
-    if (s.left) {
+  // --- Speed -------------------------------------------------------------
+  var speedButtons = Array.prototype.slice.call(el.speedGroup.querySelectorAll('button'));
+
+  function setSpeedIndex(i) {
+    speedIndex = Math.max(0, Math.min(CONFIG.speeds.length - 1, i));
+    speed = CONFIG.speeds[speedIndex];
+    speedButtons.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(parseFloat(b.getAttribute('data-speed')) === speed));
+    });
+    el.recordNote.textContent = 'Records at ' + CONFIG.speedLabels[speedIndex] +
+      ' speed. Only the drawing is captured, not these controls.';
+  }
+  speedButtons.forEach(function (b) {
+    b.addEventListener('click', function () {
+      setSpeedIndex(CONFIG.speeds.indexOf(parseFloat(b.getAttribute('data-speed'))));
+    });
+  });
+  setSpeedIndex(speedIndex);
+
+  // --- Record card -------------------------------------------------------
+  var lengthButtons = Array.prototype.slice.call(el.lengthGroup.querySelectorAll('button'));
+  var recordLength = CONFIG.defaultLength;
+
+  function setLength(sec) {
+    recordLength = sec;
+    lengthButtons.forEach(function (b) {
+      b.setAttribute('aria-pressed', String(parseInt(b.getAttribute('data-length'), 10) === sec));
+    });
+  }
+  lengthButtons.forEach(function (b) {
+    b.addEventListener('click', function () { setLength(parseInt(b.getAttribute('data-length'), 10)); });
+  });
+  setLength(recordLength);
+
+  function clock(sec) { return '0:' + (sec < 10 ? '0' : '') + sec; }
+
+  function runProgress(seconds) {
+    var p = el.progress;
+    p.style.transition = 'none';
+    p.style.transform = 'scaleX(0)';
+    p.classList.add('run');
+    void p.offsetWidth; // commit the reset before animating
+    p.style.transition = 'transform ' + seconds + 's linear';
+    p.style.transform = 'scaleX(1)';
+  }
+  function endProgress() {
+    var p = el.progress;
+    p.classList.remove('run');
+    p.style.transition = 'none';
+    p.style.transform = 'scaleX(0)';
+  }
+
+  function resetRecordButton() {
+    el.record.classList.remove('live');
+    el.recordLabel.textContent = 'Record';
+    el.record.setAttribute('aria-label', 'Record a clip');
+    endProgress();
+  }
+
+  var recorder = createRecorder(el.canvas, {
+    onTick: function (left) {
       el.record.classList.add('live');
-      el.record.textContent = 'Recording, ' + s.left;
-      return;
-    }
-    if (s.saved) {
-      el.record.classList.remove('live');
-      el.record.textContent = 'Saved ' + s.saved;
-      announce('Saved ' + s.saved);
-      setTimeout(function () { el.record.textContent = recordLabel; }, 2600);
+      el.recordLabel.textContent = 'Stop ' + clock(left);
+      el.record.setAttribute('aria-label', 'Stop recording, ' + left + ' seconds left');
+    },
+    onDone: function (result) {
+      resetRecordButton();
+      showPreview(result);
+    },
+    onError: function (message) {
+      resetRecordButton();
+      fail(message);
     }
   });
 
-  // --- Loading -------------------------------------------------------------
+  function startRecording() {
+    closeCard(true);
+    if (el.fromBuild.checked && raster) rebuild(false);
+    if (recorder.start(recordLength)) {
+      runProgress(recordLength);
+      announce('Recording started.');
+    }
+  }
+
+  el.record.addEventListener('click', function () {
+    if (recorder.isBusy()) { recorder.stop(); return; }
+    toggleCard(el.recordCard, el.record, el.startRec);
+  });
+  el.startRec.addEventListener('click', startRecording);
+  el.cancelRec.addEventListener('click', function () { closeCard(); });
+
+  // --- Preview and saving ------------------------------------------------
+  var clip = null;   // { blob, url, name, type, ext, file }
+
+  function showPreview(r) {
+    discardClip();
+    clip = { blob: r.blob, url: URL.createObjectURL(r.blob), name: r.name, type: r.type, ext: r.ext, file: null };
+    el.clip.src = clip.url;
+    el.clipMeta.textContent = r.ext.toUpperCase() + ', ' + Math.round(r.seconds) + ' seconds, ' +
+      (r.blob.size / 1048576).toFixed(1) + ' MB';
+    el.savedNote.hidden = true;
+    el.saveLabel.textContent = 'Save video';
+
+    // The native share sheet, where it accepts files (mostly phones).
+    // On a phone that's the natural way to get a clip into Photos.
+    try { clip.file = new File([r.blob], r.name, { type: r.type }); } catch (e) { clip.file = null; }
+    var canShare = !!(clip.file && navigator.canShare && navigator.canShare({ files: [clip.file] }));
+    el.shareClip.hidden = !canShare;
+    var shareFirst = canShare && touchFirst;
+    el.shareClip.classList.toggle('primary', shareFirst);
+    el.saveClip.classList.toggle('primary', !shareFirst);
+
+    showCard(el.previewCard, null, shareFirst ? el.shareClip : el.saveClip);
+    announce('Your clip is ready.');
+  }
+
+  function discardClip() {
+    if (!clip) return;
+    el.clip.pause();
+    el.clip.removeAttribute('src');
+    el.clip.load();
+    URL.revokeObjectURL(clip.url);
+    clip = null;
+  }
+
+  // Tell people exactly where the file went and how to open it.
+  function downloadsHelp() {
+    var ua = navigator.userAgent;
+    if (/iPhone|iPad|iPod/.test(ua)) return { where: 'the Files app, under Downloads', keys: null, extra: 'To put it in Photos, use Share instead.' };
+    if (/Android/.test(ua)) return { where: 'your Downloads folder', keys: null, extra: '' };
+    var mac = /Mac/.test(navigator.platform || ua);
+    var keys;
+    if (/Firefox\//.test(ua)) keys = mac ? ['\u2318', 'Shift', 'Y'] : ['Ctrl', 'Shift', 'Y'];
+    else keys = mac ? ['\u2325', '\u2318', 'L'] : ['Ctrl', 'J'];
+    return { where: 'your Downloads folder', keys: keys, extra: 'You can also right-click the video above and choose Save Video As.' };
+  }
+
+  function showSavedNote(name, where, keys, extra) {
+    var n = el.savedNote;
+    n.textContent = '';
+    n.appendChild(document.createTextNode('Saved as '));
+    var s = document.createElement('strong'); s.textContent = name; n.appendChild(s);
+    n.appendChild(document.createTextNode(' in ' + where + '.'));
+    if (keys) {
+      n.appendChild(document.createTextNode(' Press '));
+      keys.forEach(function (k, i) {
+        var kb = document.createElement('kbd'); kb.textContent = k; n.appendChild(kb);
+        if (i < keys.length - 1) n.appendChild(document.createTextNode(' '));
+      });
+      n.appendChild(document.createTextNode(' to open your downloads.'));
+    }
+    if (extra) n.appendChild(document.createTextNode(' ' + extra));
+    n.hidden = false;
+    el.saveLabel.textContent = 'Save again';
+    announce(n.textContent);
+  }
+
+  function downloadClip(c) {
+    var a = document.createElement('a');
+    a.href = c.url; a.download = c.name;
+    document.body.appendChild(a); a.click(); a.remove();
+    var help = downloadsHelp();
+    showSavedNote(c.name, help.where, help.keys, help.extra);
+  }
+
+  // Where the browser supports it (Chrome, Edge), open a real Save
+  // dialog so the person picks the folder and knows where it is.
+  // Everywhere else, a click-started download.
+  function saveClip() {
+    var c = clip;
+    if (!c) return;
+    if (window.showSaveFilePicker && window.isSecureContext) {
+      var accept = {}; accept[c.type] = ['.' + c.ext];
+      window.showSaveFilePicker({ suggestedName: c.name, types: [{ description: 'Video', accept: accept }] })
+        .then(function (handle) {
+          return handle.createWritable()
+            .then(function (w) { return w.write(c.blob).then(function () { return w.close(); }); })
+            .then(function () { showSavedNote(handle.name, 'the folder you picked', null, ''); });
+        })
+        .catch(function (e) {
+          if (e && e.name === 'AbortError') return;   // they closed the dialog
+          downloadClip(c);
+        });
+      return;
+    }
+    downloadClip(c);
+  }
+
+  function shareClip() {
+    if (!clip || !clip.file) return;
+    navigator.share({ files: [clip.file], title: 'Held Together' }).catch(function (e) {
+      if (e && e.name !== 'AbortError') fail('Sharing didn\u2019t work here. Use Save video instead.');
+    });
+  }
+
+  el.saveClip.addEventListener('click', saveClip);
+  el.shareClip.addEventListener('click', shareClip);
+  el.discardClip.addEventListener('click', function () { closeCard(true); el.record.focus(); });
+
+  // --- Shortcuts card ----------------------------------------------------
+  el.keysBtn.addEventListener('click', function () { toggleCard(el.keysCard, el.keysBtn, el.closeKeys); });
+  el.closeKeys.addEventListener('click', function () { closeCard(); });
+
+  // --- Loading -----------------------------------------------------------
   function loadSrc(src, done) {
     var img = new Image();
     img.onload = function () {
@@ -1143,8 +1737,9 @@
     loadSrc(url, function () { URL.revokeObjectURL(url); });
   }
 
-  // --- Controls ------------------------------------------------------------
+  // --- Dock --------------------------------------------------------------
   function scatterAll() { host.scatter(0, 0, 320); }
+  function replayBuild() { if (raster) rebuild(false); }
 
   el.pick.addEventListener('click', function () { el.file.click(); });
   el.file.addEventListener('change', function (e) {
@@ -1152,21 +1747,32 @@
     e.target.value = '';
   });
   el.scatter.addEventListener('click', scatterAll);
-  el.record.addEventListener('click', function () { recorder.start(); });
+  el.replay.addEventListener('click', replayBuild);
 
+  // --- Keyboard ----------------------------------------------------------
   window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape') { if (openCard) { e.preventDefault(); closeCard(); } return; }
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    var onButton = e.target && e.target.tagName === 'BUTTON';
+    var tag = e.target && e.target.tagName;
+    if (tag === 'INPUT' || tag === 'VIDEO') return;
+    if (openCard) return;                            // an open card owns the keyboard
     var key = e.key.toLowerCase();
-    if ((key === ' ' || key === 'enter') && onButton) return; // let buttons work
-    if (key === ' ' || key === 's') { e.preventDefault(); scatterAll(); }
-    else if (key === 'o' && !e.repeat) el.file.click();
-    else if (key === 'r' && !e.repeat) recorder.start();
-    else if (key === 'd' && !e.repeat) toggleHud();
+    if ((key === ' ' || key === 'enter') && tag === 'BUTTON') return;
+    if (key === ' ' || key === 's') { e.preventDefault(); scatterAll(); return; }
+    if (e.repeat) return;
+    if (key === 'b') replayBuild();
+    else if (key === 'o') el.file.click();
+    else if (key === 'r') {
+      if (recorder.isBusy()) recorder.stop(); else showCard(el.recordCard, el.record, el.startRec);
+    }
+    else if (key === 'd') toggleHud();
+    else if (key === '[') setSpeedIndex(speedIndex - 1);
+    else if (key === ']') setSpeedIndex(speedIndex + 1);
+    else if (key === '?') showCard(el.keysCard, el.keysBtn, el.closeKeys);
   });
 
-  // Drop a file anywhere. The counter handles dragenter/leave firing
-  // for every child element crossed.
+  // --- Drop and paste ----------------------------------------------------
+  // The counter handles dragenter/leave firing for every child crossed.
   var dragDepth = 0;
   function hasFiles(e) {
     var t = e.dataTransfer && e.dataTransfer.types;
@@ -1191,7 +1797,6 @@
     if (dt && dt.files && dt.files.length) loadFile(dt.files[0]);
   });
 
-  // Paste a screenshot or photo straight from the clipboard.
   window.addEventListener('paste', function (e) {
     var items = e.clipboardData && e.clipboardData.items;
     if (!items) return;
