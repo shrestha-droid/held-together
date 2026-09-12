@@ -40,8 +40,3 @@ Pick 5, 10 or 15 seconds, and optionally start the clip with the drawing buildin
 
 **Also handled:** saving only on a click (browsers can block downloads that start on their own), pausing quality changes while recording, pausing in background tabs, WebGL context loss, reduced-motion preferences, keyboard access, and screen reader announcements.
 
-## Deploy on GitHub Pages
-
-1. Create a repository and upload `index.html` and this README.
-2. Go to Settings, then Pages, and choose to deploy from the `main` branch.
-3. Your link will be `https://<username>.github.io/<repo>/`.
